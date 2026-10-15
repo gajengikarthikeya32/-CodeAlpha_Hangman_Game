@@ -3,64 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hangman | CodeAlpha</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Hangman Game</title>
+
+    <link rel="stylesheet" href="Style.css">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 30px 15px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            color: #f5f6ff;
+            background: #0d1020;
+        }
+
+        .game {
+            width: 100%;
+            max-width: 600px;
+            padding: 30px;
+            box-sizing: border-box;
+            background: #171d34;
+            border: 1px solid #303958;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        h1 span {
+            color: #52d6bf;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .stat {
+            flex: 1;
+            padding: 15px;
+            background: #222b46;
+            border-radius: 12px;
+        }
+
+        .word {
+            margin: 30px 0;
+            font-size: 32px;
+            letter-spacing: 8px;
+            overflow-wrap: anywhere;
+        }
+
+        #letters {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 7px;
+            margin: 25px 0;
+        }
+
+        button {
+            padding: 11px 15px;
+            border: none;
+            border-radius: 8px;
+            background: #514ba5;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        #restart {
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            background: #293554;
+        }
+
+        #message {
+            color: #52d6bf;
+            min-height: 24px;
+        }
+
+        @media (max-width: 400px) {
+            .game { padding: 18px; }
+            .word { font-size: 24px; letter-spacing: 4px; }
+        }
+    </style>
 </head>
+
 <body>
-    <main class="game-card">
-        <div class="badge">CODEALPHA • PYTHON PROJECT</div>
+    <main class="game">
+        <p>CODEALPHA • PYTHON PROJECT</p>
+
         <h1>Hangman <span>Game</span></h1>
-        <p class="subtitle">Find the hidden word, one letter at a time.</p>
+        <p>Find the hidden word, one letter at a time.</p>
 
-        <div class="status-row">
+        <div class="stats">
             <div class="stat">
-                <span class="stat-label">Attempts left</span>
-                <strong>{{ remaining }} / 6</strong>
+                <p>Attempts left</p>
+                <strong id="remaining">6</strong>
             </div>
+
             <div class="stat">
-                <span class="stat-label">Letters guessed</span>
-                <strong>{{ guessed|length }}</strong>
+                <p>Letters guessed</p>
+                <strong id="count">0</strong>
             </div>
         </div>
 
-        <section class="word-panel" aria-label="Hidden word">
-            <div class="word">{{ display_word }}</div>
-        </section>
+        <div id="word" class="word">_ _ _ _ _ _</div>
 
-        {% if status == "won" %}
-            <div class="message success">🎉 You won! The word was “{{ answer }}”.</div>
-        {% elif status == "lost" %}
-            <div class="message error">Game over! The word was “{{ answer }}”.</div>
-        {% elif message %}
-            <div class="message">{{ message }}</div>
-        {% else %}
-            <div class="message neutral">Choose a letter below to make your guess.</div>
-        {% endif %}
+        <p id="message">Choose a letter below!</p>
 
-        <form method="POST" class="guess-form">
-            <label for="guess">Your guess</label>
-            <div class="input-row">
-                <input id="guess" name="guess" type="text" maxlength="1"
-                       pattern="[A-Za-z]" placeholder="A" autocomplete="off"
-                       {% if status != "playing" %}disabled{% endif %} required>
-                <button type="submit" {% if status != "playing" %}disabled{% endif %}>Guess</button>
-            </div>
-        </form>
+        <div id="letters"></div>
 
-        <div class="keyboard" aria-label="Alphabet">
-            {% for letter in alphabet %}
-                {% if letter in guessed %}
-                    <span class="key used {% if letter in answer or (status == 'playing' and letter in display_word.replace(' ', '')) %}correct{% else %}wrong{% endif %}">{{ letter }}</span>
-                {% else %}
-                    <span class="key">{{ letter }}</span>
-                {% endif %}
-            {% endfor %}
-        </div>
-
-        <form method="POST">
-            <button class="new-game" type="submit" name="action" value="new">↻ New Game</button>
-        </form>
-        <p class="footer">Built with HTML, CSS, Python & Flask</p>
+        <button id="restart">↻ New Game</button>
     </main>
+
+    <script>
+        const words = [
+            "PYTHON",
+            "APPLE",
+            "TIGER",
+            "SCHOOL",
+            "COMPUTER",
+            "JAVASCRIPT"
+        ];
+
+        let answer = "";
+        let guessed = [];
+        let wrong = 0;
+        const maxWrong = 6;
+
+        const wordElement = document.getElementById("word");
+        const remainingElement = document.getElementById("remaining");
+        const countElement = document.getElementById("count");
+        const messageElement = document.getElementById("message");
+        const lettersElement = document.getElementById("letters");
+
+        function startGame() {
+            answer = words[Math.floor(Math.random() * words.length)];
+            guessed = [];
+            wrong = 0;
+
+            messageElement.textContent = "Choose a letter below!";
+            createLetters();
+            updateGame();
+        }
+
+        function createLetters() {
+            lettersElement.innerHTML = "";
+
+            for (let code = 65; code <= 90; code++) {
+                const letter = String.fromCharCode(code);
+                const button = document.createElement("button");
+
+                button.textContent = letter;
+
+                button.addEventListener("click", () => {
+                    guessLetter(letter, button);
+                });
+
+                lettersElement.appendChild(button);
+            }
+        }
+
+        function guessLetter(letter, button) {
+            if (guessed.includes(letter) || wrong >= maxWrong ||
+                [...answer].every(ch => guessed.includes(ch))) {
+                return;
+            }
+
+            guessed.push(letter);
+            button.disabled = true;
+
+            if (!answer.includes(letter)) {
+                wrong++;
+            }
+
+            updateGame();
+        }
+
+        function updateGame() {
+            wordElement.textContent = [...answer]
+                .map(letter => guessed.includes(letter) ? letter : "_")
+                .join(" ");
+
+            remainingElement.textContent = maxWrong - wrong;
+            countElement.textContent = guessed.length;
+
+            const won = [...answer].every(letter => guessed.includes(letter));
+            const lost = wrong >= maxWrong;
+
+            if (won) {
+                messageElement.textContent = "🎉 Congratulations! You won!";
+                disableLetters();
+            } else if (lost) {
+                messageElement.textContent = "Game over! The word was " + answer;
+                disableLetters();
+            }
+        }
+
+        function disableLetters() {
+            document.querySelectorAll("#letters button").forEach(button => {
+                button.disabled = true;
+            });
+        }
+
+        document.getElementById("restart").addEventListener("click", startGame);
+
+        startGame();
+    </script>
 </body>
 </html>
